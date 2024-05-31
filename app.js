@@ -5,6 +5,9 @@ import mysql from "mysql2/promise";
 const app = express();
 const port = 3000;
 
+app.use(cors(corsOptions));
+app.use(express.json());
+
 const pool = mysql.createPool({
     host: "localhost",
     user: "korad",
@@ -20,7 +23,69 @@ var corsOptions = {
     optionsSuccessStatus: 200
 }
 
-app.use(cors(corsOptions));
+
+// 생성
+app.post("/:user_code/todos", async (req, res) => {
+    const { user_code } = req.params;
+
+    const {content, performDate, is_completed = 0} = req.body;
+
+    if ( !content ) {
+        res.status(404).json({
+            resultCode: "F-1",
+            msg: "content required"
+        });
+    }
+
+    if ( !performDate ) {
+        res.status(404).json({
+            resultCode: "F-1",
+            msg: "performDate required"
+        });
+    }
+
+    const [[lastTodoRow]] = await pool.query(
+        `
+        SELECT no
+        FROM todo
+        WHERE user_code = ?
+        ORDER BY id DESC
+        LIMIT 1
+        `,
+        [user_code]
+    );
+
+    const no = lastTodoRow?.no + 1 || 1;
+
+    const [insertTodos] = await pool.query(
+        `
+            INSERT INTO todo
+            SET regDate = NOW(),
+            modifyDate = NOW(),
+            user_code = ?,
+            no = ?,
+            performDate = ?,
+            content = ?,
+            is_completed = ?
+        `,
+        [user_code, no, performDate, content, is_completed]
+    );
+
+    const [[ createdTodoRow ]] = await pool.query(
+        `
+        SELECT *
+        FROM todo
+        WHERE id = ?
+        `,
+        [insertTodos.insertId]
+    );
+
+    res.json({
+        resultCode: "S-1",
+        msg: `${createdTodoRow.id}번 할 일을 생성 하였습니다.`,
+        data: createdTodoRow
+    });
+});
 
 
 // 리스트 조회
@@ -76,7 +141,7 @@ app.get("/:user_code/todos/:no", async (req, res) => {
 
 
 // 삭제
-app.delete("/:user_code/todos/delete/:no", async (req, res) => {
+app.delete("/:user_code/todos/:no", async (req, res) => {
     const { user_code, no } = req.params;
 
     const [[ todoRow ]] = await pool.query(
