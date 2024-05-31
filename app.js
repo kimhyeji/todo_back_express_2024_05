@@ -22,6 +22,8 @@ var corsOptions = {
 
 app.use(cors(corsOptions));
 
+
+// 리스트 조회
 app.get("/:user_code/todos", async (req, res) => {
     const { user_code } = req.params;
 
@@ -42,6 +44,8 @@ app.get("/:user_code/todos", async (req, res) => {
     });
 });
 
+
+// 단건 조회
 app.get("/:user_code/todos/:no", async (req, res) => {
     const { user_code, no } = req.params;
 
@@ -67,6 +71,44 @@ app.get("/:user_code/todos/:no", async (req, res) => {
         resultCode: "S-1",
         msg: "성공",
         data: todoRow
+    });
+});
+
+
+// 삭제
+app.delete("/:user_code/todos/delete/:no", async (req, res) => {
+    const { user_code, no } = req.params;
+
+    const [[ todoRow ]] = await pool.query(
+        `
+        SELECT *
+        FROM todo
+        WHERE user_code = ?
+        AND no = ?
+        `,
+        [user_code, no]
+    );
+
+    if ( todoRow == undefined ) {
+        res.status(404).json({
+            resultCode: "F-1",
+            msg: "not found",
+        });
+        return;
+    }
+
+    await pool.query(
+        `
+        DELETE FROM todo
+        WHERE user_code = ?
+        AND no = ?
+        `
+        ,[user_code, no]
+    );
+
+    res.json({
+        resultCode: "S-1",
+        msg: `${no}번 할 일을 삭제하였습니다.`
     });
 });
 
